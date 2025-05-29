@@ -3,14 +3,19 @@
 
 local http = require("ssl.https")
 local ltn12 = require("ltn12")
-local ok, json = pcall(require, "dkjson")
-if not ok then
-    ok, json = pcall(require, "cjson")
+local json
+local ok, result = pcall(require, "dkjson")
+if ok then
+    json = result
+else
+    ok, result = pcall(require, "cjson")
+    if ok then
+        json = result
+    else
+        error("Neither dkjson nor cjson could be loaded. Please install one of them.")
+    end
 end
 
-if not ok then
-    error("Neither dkjson nor cjson could be loaded. Please install one of them.")
-end
 local socket = require("socket")
 
 local response = {}
