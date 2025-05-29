@@ -1,0 +1,44 @@
+local http = require("socket.http")
+local ltn12 = require("ltn12")
+local cjson = require("cjson") -- for JSON encode/decode
+
+local function getUserIdFromUsername(username)
+    local url = "https://users.roblox.com/v1/usernames/users"
+    local request_body = cjson.encode({
+        usernames = {username},
+        excludeBannedUsers = false
+    })
+
+    local response_body = {}
+
+    local res, code = http.request{
+        url = url,
+        method = "POST",
+        headers = {
+            ["Content-Type"] = "application/json",
+            ["Content-Length"] = tostring(#request_body)
+        },
+        source = ltn12.source.string(request_body),
+        sink = ltn12.sink.table(response_body)
+    }
+
+    if code == 200 then
+        local response_json = table.concat(response_body)
+        local parsed = cjson.decode(response_json)
+        if parsed.data and #parsed.data > 0 then
+            local userData = parsed.data[1]
+            print("Username:", userData.name)
+            print("UserId:", userData.id)
+            return userData.id
+        else
+            print("User not found.")
+        end
+    else
+        print("HTTP request failed. Status code:", code)
+    end
+
+    return nil
+end
+
+-- 🔍 Example usage:
+getUserIdFromUsername(arg[1])
