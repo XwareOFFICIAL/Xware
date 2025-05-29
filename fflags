@@ -1,0 +1,21 @@
+#!/bin/bash
+
+path="/Applications/Roblox.app"
+settings_path="$path/Contents/MacOS/ClientSettings"
+
+# Create the ClientSettings directory if it doesn't exist
+if [ ! -d "$settings_path" ]; then
+    mkdir -p "$settings_path"
+fi
+
+# Prompt user for FFlags input
+echo "Enter FFlags (e.g. \"{\\\"FFlagExample\\\": true}\"):"
+read FFLags
+
+# Print the entered FFlags
+echo "You entered: $FFLags"
+
+# Write FFlags to ClientAppSettings.json
+echo "$FFLags" > "$settings_path/ClientAppSettings.json"
+
+echo "FFlags written to $settings_path/ClientAppSettings.json"
