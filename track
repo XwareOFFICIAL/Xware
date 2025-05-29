@@ -6,12 +6,18 @@ local ltn12 = require("ltn12")
 local json = require("dkjson") or require("cjson")
 local socket = require("socket")
 
-local scriptDir = debug.getinfo(1, "S").source:match("@(.*)/")
-if not scriptDir then print("Error: Unable to determine script directory!") return end
-local filePath = scriptDir .. "/info.json"
-local file = io.open(filePath, "r")
-if not file then print("Error: Unable to open info.json!") return end
-local jsonData = file:read("*a"); file:close()
+local response = {}
+local _, code = http.request{
+    url = "https://raw.githubusercontent.com/XwareOFFICIAL/Xware/main/info", -- raw GitHub file
+    sink = ltn12.sink.table(response)
+}
+
+if code ~= 200 then
+    print("Failed to download info.json from GitHub! HTTP code:", code)
+    return
+end
+
+local jsonData = table.concat(response)
 local data, pos, err = json.decode(jsonData, 1, nil)
 if err then print("Error decoding JSON:", err) return end
 
