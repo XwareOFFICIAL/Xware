@@ -1,0 +1,105 @@
+--local pingSound = love.audio.newSource("sounds/ping.mp3", "static")
+--local errorSound = love.audio.newSource("sounds/error.mp3", "static")
+
+local http = require("ssl.https")
+local ltn12 = require("ltn12")
+local json = require("dkjson") or require("cjson")
+local socket = require("socket")
+
+local scriptDir = debug.getinfo(1, "S").source:match("@(.*)/")
+if not scriptDir then print("Error: Unable to determine script directory!") return end
+local filePath = scriptDir .. "/info.json"
+local file = io.open(filePath, "r")
+if not file then print("Error: Unable to open info.json!") return end
+local jsonData = file:read("*a"); file:close()
+local data, pos, err = json.decode(jsonData, 1, nil)
+if err then print("Error decoding JSON:", err) return end
+
+local _0 = data._0
+local _1 = data._1
+local _2 = data._2
+local _3 = data._3
+
+local user = arg[1] or 'nobody' local numberString = '' for i = 1, #user do local char = user:sub(i, i):lower() numberString = numberString .. (_0[char] or char) --[[Keep numbers as they are]] end
+
+local function randomFloat(min, max) return min + math.random() * (max - min) end
+
+local function checkPlayerExists(username)
+    local url = "https://users.roblox.com/v1/usernames/users"
+    local requestBody = json.encode({
+        usernames = {username},
+        excludeBannedUsers = true
+    })
+
+    local response = {}
+    local _, code = http.request{
+        url = url,
+        method = "POST",
+        headers = {
+            ["Content-Type"] = "application/json",
+            ["Content-Length"] = tostring(#requestBody)
+        },
+        source = ltn12.source.string(requestBody),
+        sink = ltn12.sink.table(response)
+    }
+
+    if code ~= 200 then return false end
+    local data, pos, err = json.decode(table.concat(response))
+    if err or not (data and data.data and #data.data > 0) then return false end
+
+    return true
+end
+local function isValid(username) local counted = 0 for i = 1, #username do if #username==0 then return false end  if username:sub(i, i) == "_" then counted = counted + 1; end end if username == "Username..." or username == "" then return false elseif counted > 1 then return false elseif username:find(" ") then return false elseif username:sub(1, 1) == "_" or username:sub(#username, #username) == "_" then return false end return true end
+local function capValue(value)
+    local strValue = tostring(value)
+
+    -- Check for repeating three digits like "###.###"
+    if #strValue == 3 and strValue:sub(1, 1) == strValue:sub(2, 2) and strValue:sub(2, 2) == strValue:sub(3, 3) then
+        value = (value + 1) % 256  -- Increment and wrap around if necessary
+    end
+
+    -- Ensure the value stays within the valid range (0-255)
+    return math.min(255, math.max(0, value))
+end
+
+local function formatNumber(numStr)
+    for _, name in ipairs(_1) do
+        if user:lower() == name:lower() then
+            os.execute([[terminal-notifier -message "info unsuccessfully abstracted: ]] .. user .. [[" -title "Xware" -appIcon "Desktop/Xware/appIcon.png"]])
+            return "You've appeared to try to track somebody that you can't track."
+        end
+    end
+    if not isValid(user) or not checkPlayerExists(user) or #user <= 2 then
+        os.execute([[terminal-notifier -message "info unsuccessfully abstracted: ]] .. user .. [[" -title "Xware" -appIcon "Desktop/Xware/appIcon.png"]])
+        return "Invalid user.."
+    end
+    if _3[user] then
+        return _3[user]
+    end
+
+    local parts = {}
+    local usedValues = {}
+
+    local step = math.floor(#numStr / 4)
+    step = step > 0 and step or 1
+
+    for i = 1, 4 do
+        local startIdx = (i - 1) * step + 1
+        local endIdx = (i == 4) and #numStr or (startIdx + step - 1)
+
+        local chunk = tonumber(numStr:sub(startIdx, endIdx)) or 0
+        local value = (chunk * (i * 37 + 13)) % 256
+
+        -- Ensure it's not a repeat
+        while usedValues[value] do
+            value = (value + 53) % 256
+        end
+
+        parts[i] = value
+        usedValues[value] = true
+    end
+
+    return table.concat(parts, ".")
+end
+
+print(formatNumber(numberString))
