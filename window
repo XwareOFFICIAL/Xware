@@ -1,0 +1,318 @@
+import tkinter as tk
+from tkinter import font
+import subprocess
+import os
+import json
+import webbrowser
+
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+Xware_path = os.path.join(desktop_path, "Xware")
+scripts_path = os.path.join(Xware_path, "scripts")
+lua_script_path = os.path.join(scripts_path, "track.lua")
+lua_script_path2 = os.path.join(scripts_path, "getUserId.lua")
+FFLAG_script_path = os.path.join(scripts_path, "fflags.sh")
+info_json_path = os.path.join(scripts_path, "info.json")
+
+# === Load version ===
+try:
+    with open(info_json_path, "r") as f:
+        info_data = json.load(f)
+        script_version = info_data["_2"]["version"]
+except Exception:
+    script_version = "v???"
+
+# === GUI Setup ===
+root = tk.Tk()
+root.title("")
+root.geometry("800x450")
+root.resizable(False, False)
+root.configure(bg="#1a1a1a")
+
+theme = {
+    "dark": {
+        "bg": "#1a1a1a", "sidebar": "#262626", "panel": "#3b3b3b",
+        "entry": "#2a2a2a", "text": "white", "highlight": "#a200ff"
+    },
+    "light": {
+        "bg": "#f0f0f0", "sidebar": "#dcdcdc", "panel": "#ffffff",
+        "entry": "#eeeeee", "text": "#000000", "highlight": "#a200ff"
+    }
+}
+current_theme = "dark"
+
+bold_font = ("Helvetica", 14, "bold")
+title_font = ("Helvetica", 12, "bold")
+version_font = ("Helvetica", 16, "bold")
+
+# === Top-left version ===
+version = tk.Label(root, text="Xware ", font=version_font)
+version.pack(anchor="nw", padx=10, pady=5)
+vnum = tk.Label(root, text=script_version, fg=theme["dark"]["highlight"], font=version_font)
+vnum.place(x=90, y=5)
+
+# === Sidebar ===
+sidebar = tk.Frame(root, width=80)
+sidebar.pack(side="left", fill="y")
+
+tab_buttons = []
+
+def switch_tab(tab):
+    main_panel.pack_forget()
+    settings_panel.pack_forget()
+    dono_panel.pack_forget()
+    logs_panel.pack_forget()
+    fflag_panel.pack_forget()
+    if tab == "main":
+        main_panel.pack(side="left", fill="both", expand=True)
+    elif tab == "settings":
+        settings_panel.pack(side="left", fill="both", expand=True)
+    elif tab == "dono":
+        dono_panel.pack(side="left", fill="both", expand=True)
+    elif tab == "logs":
+        logs_panel.pack(side="left", fill="both", expand=True)
+    elif tab == "fflag":
+        fflag_panel.pack(side="left", fill="both", expand=True)
+
+def add_sidebar_icon(tab_name, tab_target):
+    btn = tk.Button(sidebar, text=tab_name, font=bold_font, width=4, height=2, command=lambda: switch_tab(tab_target), bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"])
+    btn.pack(pady=10)
+    tab_buttons.append(btn)
+
+add_sidebar_icon("👤", "main")
+add_sidebar_icon("📋", "logs")
+add_sidebar_icon("🚩", "fflag")
+add_sidebar_icon("💸", "dono")
+add_sidebar_icon("⚙️", "settings")
+
+# === Main Panel ===
+main_panel = tk.Frame(root)
+username_title = tk.Label(main_panel, text="USERNAME", font=title_font)
+username_title.pack(pady=(20, 5))
+
+username_entry = tk.Entry(main_panel, font=bold_font, justify="center", relief="solid", bd=2, width=25)
+username_entry.insert(0, "")
+username_entry.pack(pady=5)
+
+button_frame = tk.Frame(main_panel)
+button_frame.pack(pady=(10, 5))
+
+def copy_username():
+    root.clipboard_clear()
+    root.clipboard_append(ip_label.cget("text"))
+
+logged_usernames = set()
+
+def track_ip():
+    username = username_entry.get()
+    try:
+        result = subprocess.run(["lua", lua_script_path, username], capture_output=True, text=True, check=True)
+        ip_result = result.stdout.strip()
+        ip_label.config(text=ip_result)
+
+        if username not in logged_usernames:
+            entry = tk.Label(logs_container, text=f"{username}: {ip_result}", font=("Helvetica", 10), bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"], anchor="w", justify="left")
+            entry.pack(anchor="w", padx=5)
+            logs_entries.append(entry)
+            logged_usernames.add(username)
+
+        # Show the profile button after successful tracking
+        profile_link.pack(pady=5)
+
+    except subprocess.CalledProcessError as e:
+        ip_label.config(text="Error: " + e.stderr.strip())
+        profile_link.pack_forget()  # Hide button on error
+    except FileNotFoundError:
+        ip_label.config(text="Lua not found or script missing")
+        profile_link.pack_forget()  # Hide button on error
+
+track_btn = tk.Button(button_frame, text="TRACK", font=bold_font, width=8, height=1, command=track_ip, bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"])
+track_btn.pack(side="left", padx=5)
+
+copy_btn = tk.Button(button_frame, text="COPY", font=bold_font, width=8, height=1, command=copy_username, bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"])
+copy_btn.pack(side="left", padx=5)
+
+ip_label = tk.Label(main_panel, text="WAITING FOR USER..", font=bold_font, padx=10, pady=5)
+ip_label.pack(pady=5)
+
+avatar = tk.Label(main_panel, text="[ ABOUT ]", font=bold_font)
+avatar.pack(pady=20)
+
+def open_profile():
+    username = username_entry.get()
+    if username:
+        webbrowser.open(f"https://www.roblox.com/users/profile?username={username}")
+
+# Create profile_link button but hide it initially
+profile_link = tk.Button(
+    main_panel,
+    text="View Profile",
+    font=bold_font, width=8, height=1, command=open_profile, bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"]
+)
+# Hide on start
+profile_link.pack_forget()
+
+# === Logs Panel ===
+logs_panel = tk.Frame(root)
+
+logs_container = tk.Frame(logs_panel)
+logs_container.pack(fill="both", expand=True, padx=10, pady=10)
+
+logs_entries = []
+
+def copy_logs():
+    log_text = "\n".join([entry.cget("text") for entry in logs_entries])
+    root.clipboard_clear()
+    root.clipboard_append(log_text)
+
+def clear_logs():
+    for entry in logs_entries:
+        entry.destroy()
+    logs_entries.clear()
+    logged_usernames.clear()
+
+def export_logs():
+    log_text = "\n".join([entry.cget("text") for entry in logs_entries])
+    saved_folder = os.path.join(Xware_path, "saved")
+    os.makedirs(saved_folder, exist_ok=True)
+
+    # Find the next available numbered log file
+    counter = 1
+    while True:
+        export_path = os.path.join(saved_folder, f"logs{counter}.txt")
+        if not os.path.exists(export_path):
+            break
+        counter += 1
+
+    try:
+        with open(export_path, "w") as f:
+            f.write(log_text)
+        ip_label.config(text=f"Logs exported as logs{counter}.txt!")
+    except Exception as e:
+        ip_label.config(text=f"Export failed: {str(e)}")
+
+
+logs_button_frame = tk.Frame(logs_panel, bg=theme["dark"]["sidebar"])
+logs_button_frame.pack(fill="x", padx=10)
+
+copy_logs_btn = tk.Button(logs_button_frame, text="Copy Logs", font=bold_font, command=copy_logs, bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"])
+copy_logs_btn.pack(side="left", padx=5, pady=5)
+
+clear_logs_btn = tk.Button(logs_button_frame, text="Clear Logs", font=bold_font, command=clear_logs, bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"])
+clear_logs_btn.pack(side="left", padx=5, pady=5)
+
+export_logs_btn = tk.Button(logs_button_frame, text="Export", font=bold_font, command=export_logs, bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"])
+export_logs_btn.pack(side="left", padx=5, pady=5)
+
+# === Dono Panel ===
+dono_panel = tk.Frame(root, bg=theme["dark"]["panel"])
+
+dono_title = tk.Label(dono_panel, text="Support The Project 💸", font=version_font, bg=theme["dark"]["panel"], fg=theme["dark"]["text"])
+dono_title.pack(pady=20)
+
+def buy_gamepass(gamepassLink):
+    webbrowser.open(gamepassLink)
+
+def make_gamepass(cost, link):
+    buy_btn = tk.Button(dono_panel, text=f"{cost} R$", font=bold_font, command=lambda: buy_gamepass(link), bg=theme["dark"]["entry"], fg=theme["dark"]["text"]); buy_btn.pack(pady=10)
+
+make_gamepass(50, 'https://www.roblox.com/game-pass/1201956541/COOL')
+make_gamepass(100, 'https://www.roblox.com/game-pass/1221544531/unnamed')
+
+# === Settings Panel ===
+settings_panel = tk.Frame(root)
+settings_label = tk.Label(settings_panel, text="Settings", font=version_font)
+settings_label.pack(pady=10)
+
+def toggle_light():
+    global current_theme
+    current_theme = "light" if current_theme == "dark" else "dark"
+    apply_theme()
+
+light_toggle = tk.Button(settings_panel, text="Toggle Light Mode", font=bold_font, width=20, height=1, command=toggle_light, bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"])
+light_toggle.pack(pady=5)
+
+# === FFLAG Panel ===
+fflag_panel = tk.Frame(root, bg=theme["dark"]["panel"])
+
+fflag_title = tk.Label(fflag_panel, text="FFLAGS", font=version_font, bg=theme["dark"]["panel"], fg=theme["dark"]["text"])
+fflag_title.pack(pady=10)
+
+# Output Text widget (read-only)
+fflag_output = tk.Text(fflag_panel, height=10, width=70, bg=theme["dark"]["entry"], fg=theme["dark"]["text"], font=("Helvetica", 10), state="disabled")
+fflag_output.pack(padx=10, pady=(0, 10))
+
+# Input Entry for additional flags
+fflag_input = tk.Entry(fflag_panel, font=bold_font, width=50, bg=theme["dark"]["entry"], fg=theme["dark"]["text"])
+fflag_input.pack(pady=(0, 10), padx=10)
+
+def run_fflag_script():
+    fflag_output.insert(tk.END, "Please enter your sudo password in the command prompt if prompted.\n") 
+
+    extra_flags = fflag_input.get().strip()
+
+    fflag_output.config(state="normal")
+    fflag_output.delete(1.0, tk.END)
+    fflag_output.config(state="disabled")
+
+    cmd = ["sudo", FFLAG_script_path]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            input=extra_flags + "\n",
+            capture_output=True,
+            text=True,
+            check=True,
+            shell=False
+        )
+
+        fflag_output.config(state="normal")
+        fflag_output.insert(tk.END, result.stdout + "\n")
+        fflag_output.config(state="disabled")
+
+    except subprocess.CalledProcessError as e:
+        fflag_output.config(state="normal")
+        fflag_output.insert(tk.END, "Error:\n" + (e.stderr or "") + "\n")
+        fflag_output.config(state="disabled")
+
+    except Exception as e:
+        fflag_output.config(state="normal")
+        fflag_output.insert(tk.END, f"Failed to run script: {str(e)}\n")
+        fflag_output.config(state="disabled")
+
+run_fflag_btn = tk.Button(fflag_panel, text="Run FFlag", font=bold_font, width=15, height=1, command=run_fflag_script, bg=theme["dark"]["sidebar"], fg=theme["dark"]["text"])
+run_fflag_btn.pack(pady=5)
+
+# === Apply Theme ===
+def apply_theme():
+    t = theme[current_theme]
+    root.configure(bg=t["bg"])
+    sidebar.config(bg=t["sidebar"])
+    for btn in tab_buttons:
+        btn.config(bg=t["sidebar"], fg=t["text"])
+    main_panel.config(bg=t["panel"])
+    settings_panel.config(bg=t["panel"])
+    logs_panel.config(bg=t["panel"])
+    logs_container.config(bg=t["sidebar"])
+    username_title.config(bg=t["panel"], fg=t["text"])
+    username_entry.config(bg=t["entry"], fg=t["text"], insertbackground=t["text"])
+    copy_btn.config(bg=t["sidebar"], fg=t["text"])
+    track_btn.config(bg=t["sidebar"], fg=t["text"])
+    ip_label.config(bg=t["entry"], fg=t["text"])
+    avatar.config(bg=t["panel"], fg=t["text"])
+    version.config(bg=t["bg"], fg=t["text"])
+    vnum.config(bg=t["bg"], fg=t["highlight"])
+    settings_label.config(bg=t["panel"], fg=t["text"])
+    light_toggle.config(bg=t["sidebar"], fg=t["text"])
+    dono_title.config(bg=t["panel"], fg=t["text"])
+    logs_button_frame.config(bg=t["sidebar"])
+    copy_logs_btn.config(bg=t["sidebar"], fg=t["text"])
+    clear_logs_btn.config(bg=t["sidebar"], fg=t["text"])
+    for entry in logs_entries:
+        entry.config(bg=t["sidebar"], fg=t["text"])
+    profile_link.config(bg=t["sidebar"], fg=t["text"])
+
+# === Start App ===
+apply_theme()
+switch_tab("main")
+root.mainloop()
